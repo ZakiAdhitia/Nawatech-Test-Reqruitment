@@ -1,0 +1,232 @@
+@page
+@{
+    ViewData["Title"] = "Product List";
+    Layout = "/Pages/Shared/Layout.cshtml";
+    @await Html.PartialAsync("Navbar")
+}
+<link href="~/css/layoutTable.css" rel="stylesheet" />
+
+
+<div class="container mt-5">
+    <div class="form-container">
+        <h2 class="page-title">Daftar Produk</h2>
+
+        <form id="formCreateProduct" enctype="multipart/form-data">
+            <input type="hidden" name="id" />
+            <div class="row">
+                <div class="col-md-3">
+                    <input name="name" class="form-control" placeholder="Nama Produk" required />
+                </div>
+                <div class="col-md-2">
+                    <input name="price" type="number" class="form-control" placeholder="Harga Produk" required />
+                </div>
+                <div class="col-md-2">
+                    <input name="description" class="form-control" placeholder="Deskripsi Produk" required />
+                </div>
+                <div class="col-md-3">
+                    <select name="categoryId" class="form-control" id="categorySelect" required>
+                        <option value="">Pilih Kategori</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <input name="image" type="file" class="form-control" />
+                </div>
+                <div class="col-md-12 col-lg-2">
+                    <button type="submit" class="btn btn-primary w-100" id="submitBtn">Tambah</button>
+                    <button type="button" class="btn btn-secondary w-100 mt-2" id="cancelEditBtn"
+                        style="display:none;">Batal Edit</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-container">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Nama</th>
+                    <th>Kategori</th>
+                    <th>Harga</th>
+                    <th>Deskripsi</th>
+                    <th>Gambar</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody id="productTableBody">
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+            window.location.href = "/Auth/Login";
+        }
+
+        async function loadProducts() {
+            const tbody = document.getElementById('productTableBody');
+            tbody.innerHTML = '<tr><td colspan="6" class="table-loading">Memuat data...</td></tr>';
+
+            try {
+                const res = await fetch('/api/product/get-all-product', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = await res.json();
+                tbody.innerHTML = '';
+
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="table-empty">Tidak ada data produk</td></tr>';
+                    return;
+                }
+
+                data.forEach(product => {
+                    const row = `
+                            <tr>
+                                <td>${product.name}</td>
+                                <td>${product.category?.name || '-'}</td>
+                                <td>Rp ${Number(product.price).toLocaleString('id-ID')}</td>
+                                <td>${product.description || '-'}</td>
+                                <td><img src="/Data/Static/Images/${product.image}" class="product-image" alt="${product.name}"/></td>
+                                <td>
+                                    <button onclick="deleteProduct(${product.id})" class="btn btn-danger">Hapus</button>
+                                    <button onclick="editProduct(${product.id})" class="btn btn-warning">Edit</button>
+                                </td>
+                            </tr>
+                        `;
+                    tbody.innerHTML += row;
+                });
+            } catch (error) {
+                tbody.innerHTML = '<tr><td colspan="6" class="table-empty">Gagal memuat data</td></tr>';
+                console.error('Error loading products:', error);
+            }
+        }
+
+        async function deleteProduct(id) {
+            if (!confirm("Yakin ingin menghapus produk ini?")) return;
+
+            try {
+                const res = await fetch(`/api/product/delete-product/${id}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const result = await res.json();
+                alert(result.message);
+                loadProducts();
+            } catch (error) {
+                alert('Gagal menghapus produk');
+                console.error('Error deleting product:', error);
+            }
+        }
+
+        async function editProduct(id) {
+            try {
+                const res = await fetch(`/api/product/get-product/${id}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (!res.ok) {
+                    alert("Gagal mengambil data produk");
+                    return;
+                }
+                const product = await res.json();
+
+                const form = document.getElementById('formCreateProduct');
+                form.id.value = product.id;
+                form.name.value = product.name;
+                form.price.value = product.price;
+                form.description.value = product.description;
+
+                document.getElementById('categorySelect').value = product.categoryId;
+                document.getElementById('submitBtn').textContent = 'Update';
+                document.getElementById('cancelEditBtn').style.display = 'block';
+
+                document.querySelector('.form-container').scrollIntoView({ behavior: 'smooth' });
+            } catch (error) {
+                alert('Gagal mengambil data produk');
+                console.error('Error editing product:', error);
+            }
+        }
+
+        async function loadCategories() {
+            const categorySelect = document.getElementById('categorySelect');
+
+            try {
+                const res = await fetch('/api/productcategory/get-all-category', {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                });
+
+                const categories = await res.json();
+
+                categorySelect.innerHTML = '<option value="">Pilih Kategori</option>';
+
+                categories.forEach(cat => {
+                    const option = document.createElement('option');
+                    option.value = cat.id;
+                    option.textContent = cat.name;
+                    categorySelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Gagal memuat kategori:', error);
+                categorySelect.innerHTML = '<option value="">Gagal memuat</option>';
+            }
+        }
+
+        function resetForm() {
+            const form = document.getElementById('formCreateProduct');
+            form.reset();
+            form.id.value = '';
+            document.getElementById('submitBtn').textContent = 'Tambah';
+            document.getElementById('cancelEditBtn').style.display = 'none';
+        }
+
+        document.getElementById('cancelEditBtn').addEventListener('click', function () {
+            resetForm();
+        });
+
+        document.getElementById('formCreateProduct').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const id = formData.get('id');
+
+            let url = '/api/product/create-product';
+            let method = 'POST';
+
+            if (id) {
+                url = `/api/product/update-product/${id}`;
+                method = 'PUT';
+            }
+
+            const submitBtn = document.getElementById('submitBtn');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = id ? 'Updating...' : 'Adding...';
+
+            try {
+                const res = await fetch(url, {
+                    method,
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    },
+                    body: formData
+                });
+
+                const result = await res.json();
+                alert(result.message);
+                resetForm();
+                loadProducts();
+            } catch (error) {
+                alert('Gagal menyimpan data');
+                console.error('Error saving product:', error);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            }
+        });
+
+        loadCategories();
+        loadProducts();
+    </script>
+}

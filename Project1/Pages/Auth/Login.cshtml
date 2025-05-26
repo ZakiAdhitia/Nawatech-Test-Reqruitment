@@ -1,0 +1,160 @@
+@page
+@{
+    Layout = "/Pages/Shared/Layout.cshtml";
+}
+
+<div class="login-container">
+    <div class="decorative-shape shape-1"></div>
+    <div class="decorative-shape shape-2"></div>
+    <div class="decorative-shape shape-3"></div>
+
+    <div class="login-card">
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label class="form-label" for="username">Username/Email</label>
+                <div class="input-icon">
+                    <input id="username" name="username" type="text" class="form-control" 
+                           placeholder="Masukan Username" required />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="password">Password</label>
+                <div class="input-icon">
+                    <input id="password" name="password" type="password" class="form-control" 
+                           placeholder="Masukan Password" required />
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-login">Sign in</button>
+        </form>
+
+        <form id="registerForm" style="display: none;" enctype="multipart/form-data">
+            <div class="form-group">
+                <label class="form-label" for="regUsername">Username</label>
+                <input id="regUsername" name="username" type="text" class="form-control" required />
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="regPassword">Password</label>
+                <input id="regPassword" name="password" type="password" class="form-control" required />
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="email">Email</label>
+                <input id="email" name="email" type="email" class="form-control" required />
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="image">Profile Picture</label>
+                <input id="image" name="image" type="file" class="form-control" />
+            </div>
+            <button type="submit" class="btn btn-login">Register</button>
+        </form>
+
+        <div class="form-links"></div>
+            <a href="#" id="toggleForm">Register</a>
+        </div>
+
+        <div id="message" class="mt-3"></div>
+    </div>
+
+@section Scripts {
+<script>
+const toggleFormLink = document.getElementById('toggleForm');
+const loginForm = document.getElementById('loginForm');
+const registerForm = document.getElementById('registerForm');
+let isLogin = true;
+
+toggleFormLink.addEventListener('click', function (e) {
+    e.preventDefault();
+    isLogin = !isLogin;
+
+    if (isLogin) {
+        loginForm.style.display = 'block';
+        registerForm.style.display = 'none';
+        toggleFormLink.innerText = 'Register';
+    } else {
+        loginForm.style.display = 'none';
+        registerForm.style.display = 'block';
+        toggleFormLink.innerText = 'Login';
+    }
+});
+
+document.getElementById('registerForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    const formData = new FormData();
+    formData.append("username", document.getElementById('regUsername').value.trim());
+    formData.append("password", document.getElementById('regPassword').value.trim());
+    formData.append("email", document.getElementById('email').value.trim());
+
+    const imageInput = document.getElementById('image');
+    if (imageInput.files.length > 0) {
+        formData.append("image", imageInput.files[0]);
+    }
+
+    try {
+        const response = await fetch('http://localhost:5026/api/auth/register', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            document.getElementById('message').innerText = data.message || 'Registrasi gagal.';
+            return;
+        }
+
+        document.getElementById('message').innerText = data.message || 'Registrasi berhasil!';
+
+        toggleFormLink.click();
+    } catch (error) {
+        document.getElementById('message').innerText = 'Terjadi kesalahan saat registrasi.';
+        console.error(error);
+    }
+});
+
+document.getElementById('loginForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value.trim();
+
+    if (!username || !password) {
+        document.getElementById('message').innerText = "Username dan password wajib diisi.";
+        return;
+    }
+
+    const payload = {
+        username: username,
+        password: password
+    };
+
+    try {
+        const response = await fetch('http://localhost:5026/api/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            document.getElementById('message').innerText = data.message || 'Login gagal.';
+            return;
+        }
+
+        document.getElementById('message').innerText = data.message || 'Login berhasil!';
+
+        localStorage.setItem('authToken', data.token);
+
+        window.location.href = '/Welcome';
+    } catch (error) {
+        document.getElementById('message').innerText = 'Terjadi kesalahan saat login.';
+        console.error(error);
+    }
+});
+</script>
+}

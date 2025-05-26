@@ -1,0 +1,231 @@
+@page
+@{
+    ViewData["Title"] = "Product Categories";
+    Layout = "/Pages/Shared/Layout.cshtml";
+    @await Html.PartialAsync("Navbar")
+}
+<link href="~/css/layoutTable.css" rel="stylesheet" />
+
+<div class="container mt-5">
+    <div class="form-container">
+        <h2 class="page-title">Daftar Kategori Produk</h2>
+
+        <form id="formCreateCategory">
+            <input type="hidden" name="id" />
+            <div class="row">
+                <div class="col-md-6">
+                    <input name="name" class="form-control" placeholder="Nama Kategori" required />
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary w-100" id="submitBtn">Tambah</button>
+                    <button type="button" class="btn btn-secondary w-100 mt-2" id="cancelEditBtn" style="display:none;">Batal Edit</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-container">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Nama Kategori</th>
+                    <th>Tanggal Dibuat</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody id="categoryTableBody">
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+            window.location.href = "/Auth/Login";
+        }
+
+        async function loadCategories() {
+            const tbody = document.getElementById('categoryTableBody');
+            tbody.innerHTML = '<tr><td colspan="3" class="table-loading">Memuat data kategori...</td></tr>';
+            
+            try {
+                const res = await fetch('/api/ProductCategory/get-all-category', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                
+                if (!res.ok) {
+                    throw new Error('Failed to fetch categories');
+                }
+                
+                const data = await res.json();
+                tbody.innerHTML = '';
+
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" class="table-empty">Belum ada kategori produk</td></tr>';
+                    return;
+                }
+
+                data.forEach(category => {
+                    const createdDate = new Date(category.createdAt).toLocaleDateString('id-ID', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    
+                    const row = `
+                        <tr>
+                            <td><strong>${category.name}</strong></td>
+                            <td>${createdDate}</td>
+                            <td>
+                                <button onclick="editCategory(${category.id})" class="btn btn-warning">Edit</button>
+                                <button onclick="deleteCategory(${category.id})" class="btn btn-danger">Hapus</button>
+                            </td>
+                        </tr>
+                    `;
+                    tbody.innerHTML += row;
+                });
+            } catch (error) {
+                tbody.innerHTML = '<tr><td colspan="3" class="table-empty">Gagal memuat data kategori</td></tr>';
+                console.error('Error loading categories:', error);
+            }
+        }
+
+        async function deleteCategory(id) {
+            if (!confirm("Yakin ingin menghapus kategori ini?\n\nPerhatian: Produk yang menggunakan kategori ini mungkin akan terpengaruh.")) return;
+
+            try {
+                const res = await fetch(`/api/ProductCategory/delete-category/${id}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                
+                const result = await res.json();
+                
+                if (res.ok) {
+                    alert('✅ ' + result.message);
+                } else {
+                    alert('❌ ' + result.message);
+                }
+                
+                loadCategories();
+            } catch (error) {
+                alert('❌ Gagal menghapus kategori');
+                console.error('Error deleting category:', error);
+            }
+        }
+
+        async function editCategory(id) {
+            try {
+                const res = await fetch(`/api/ProductCategory/get-category/${id}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+
+                if (!res.ok) {
+                    alert("❌ Gagal mengambil data kategori");
+                    return;
+                }
+
+                const category = await res.json();
+                const form = document.getElementById('formCreateCategory');
+                form.id.value = category.id;
+                form.name.value = category.name;
+
+                document.getElementById('submitBtn').textContent = 'Update';
+                document.getElementById('cancelEditBtn').style.display = 'block';
+                
+                document.querySelector('.form-container').scrollIntoView({ 
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+                
+                setTimeout(() => {
+                    form.name.focus();
+                    form.name.select();
+                }, 500);
+                
+            } catch (error) {
+                alert('❌ Gagal mengambil data kategori');
+                console.error('Error editing category:', error);
+            }
+        }
+
+        function resetForm() {
+            const form = document.getElementById('formCreateCategory');
+            form.reset();
+            form.id.value = '';
+            document.getElementById('submitBtn').textContent = 'Tambah';
+            document.getElementById('cancelEditBtn').style.display = 'none';
+        }
+
+        document.getElementById('cancelEditBtn').addEventListener('click', function () {
+            resetForm();
+        });
+
+        document.getElementById('formCreateCategory').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const id = formData.get('id');
+            const body = {
+                name: formData.get('name').trim()
+            };
+
+            if (!body.name) {
+                alert('❌ Nama kategori harus diisi');
+                return;
+            }
+
+            if (body.name.length < 2) {
+                alert('❌ Nama kategori minimal 2 karakter');
+                return;
+            }
+
+            let url = '/api/ProductCategory/create-category';
+            let method = 'POST';
+
+            if (id) {
+                url = `/api/ProductCategory/update-category/${id}`;
+                method = 'PUT';
+            }
+
+            const submitBtn = document.getElementById('submitBtn');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = id ? 'Updating...' : 'Menambah...';
+
+            try {
+                const res = await fetch(url, {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`
+                    },
+                    body: JSON.stringify(body)
+                });
+
+                const result = await res.json();
+                
+                if (res.ok) {
+                    alert('✅ ' + result.message);
+                    resetForm();
+                    loadCategories();
+                } else {
+                    alert('❌ ' + result.message);
+                }
+                
+            } catch (error) {
+                alert('❌ Gagal menyimpan kategori');
+                console.error('Error saving category:', error);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            }
+        });
+
+        loadCategories();
+
+    </script>
+}

@@ -1,0 +1,193 @@
+@page
+@{
+    ViewData["Title"] = "Profile";
+    Layout = "/Pages/Shared/Layout.cshtml";
+    @await Html.PartialAsync("Navbar")
+}
+<link href="~/css/layoutTable.css" rel="stylesheet" />
+<link href="~/css/Animation.css" rel="stylesheet" />
+
+<div class="profile-container">
+    <div class="decorative-shape shape-1"></div>
+    <div class="decorative-shape shape-2"></div>
+    <div class="decorative-shape shape-3"></div>
+    <div class="container">
+        <div id="alertBox"></div>
+        
+        <div class="profile-card">
+            <div class="profile-header">
+                <img id="profileImage" class="profile-avatar" />
+                <h1 id="usernameDisplay" class="profile-name"></h1>
+                <p id="emailDisplay" class="profile-email"></p>
+                <button class="edit-btn" onclick="toggleEditForm()">
+                    <i class="fas fa-edit me-2"></i>Edit Profile
+                </button>
+            </div>
+            
+            <div class="profile-body">
+
+                
+                <form id="editProfileForm" class="edit-form d-none" enctype="multipart/form-data" onsubmit="return updateProfile(event)">
+                    <h5 style="color: #333; margin-bottom: 1.5rem; text-align: center;">
+                        <i class="fas fa-user-edit me-2"></i>Edit Profile Information
+                    </h5>
+                    
+                    <div class="form-group">
+                        <label for="usernameInput" class="form-label">
+                            <i class="fas fa-user me-2"></i>Username
+                        </label>
+                        <input type="text" class="form-control" id="usernameInput" name="Username" placeholder="Enter your username" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="emailInput" class="form-label">
+                            <i class="fas fa-envelope me-2"></i>Email Address
+                        </label>
+                        <input type="email" class="form-control" id="emailInput" name="Email" placeholder="Enter your email" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="imageInput" class="form-label">
+                            <i class="fas fa-camera me-2"></i>Profile Picture
+                        </label>
+                        <input type="file" class="form-control" id="imageInput" name="Image" accept="image/*" />
+                        <small class="text-muted">Choose a new profile picture (JPG, PNG, GIF)</small>
+                    </div>
+                    
+                    <div class="text-center">
+                        <button type="submit" class="btn-save">
+                            <i class="fas fa-check me-2"></i>Save Changes
+                        </button>
+                        <button type="button" class="btn-cancel" onclick="toggleEditForm()">
+                            <i class="fas fa-times me-2"></i>Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentUser = null;
+
+    async function loadProfile() {
+        const token = localStorage.getItem("authToken");
+        if (!token) {
+            showAlert("Token tidak ditemukan. Silakan login ulang.", "danger");
+            setTimeout(() => {
+                window.location.href = "/Auth/Login";
+            }, 2000);
+            return;
+        }
+
+        try {
+            const res = await fetch('http://localhost:5026/api/auth/profile', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (!res.ok) {
+                showAlert("Gagal memuat profil.", "danger");
+                return;
+            }
+
+            const user = await res.json();
+            currentUser = user;
+
+            const imageUrl = user.image ? `/Data/Static/Images/${user.image}` : "/images/default-profile.png";
+
+            document.getElementById("profileImage").src = imageUrl;
+            document.getElementById("usernameDisplay").textContent = user.username;
+            document.getElementById("emailDisplay").textContent = user.email;
+
+            document.getElementById("usernameInput").value = user.username;
+            document.getElementById("emailInput").value = user.email;
+
+        } catch (err) {
+            showAlert("Terjadi kesalahan saat memuat profil.", "danger");
+        }
+    }
+
+    function toggleEditForm() {
+        const form = document.getElementById("editProfileForm");
+        const isHidden = form.classList.contains("d-none");
+        
+        if (isHidden) {
+            form.classList.remove("d-none");
+            form.style.animation = "slideDown 0.3s ease";
+        } else {
+            form.style.animation = "slideUp 0.3s ease";
+            setTimeout(() => {
+                form.classList.add("d-none");
+            }, 300);
+        }
+    }
+
+    function showAlert(message, type = "info") {
+        const alertBox = document.getElementById("alertBox");
+        alertBox.innerHTML = `
+            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-triangle' : 'info-circle'} me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+        
+        setTimeout(() => {
+            const alert = alertBox.querySelector('.alert');
+            if (alert) {
+                alert.classList.remove('show');
+                setTimeout(() => {
+                    alertBox.innerHTML = '';
+                }, 150);
+            }
+        }, 5000);
+    }
+
+    async function updateProfile(event) {
+        event.preventDefault();
+
+        const token = localStorage.getItem("authToken");
+        if (!token) {
+            showAlert("Token tidak ditemukan. Silakan login ulang.", "danger");
+            return false;
+        }
+
+        const form = document.getElementById("editProfileForm");
+        const formData = new FormData(form);
+        
+        const submitBtn = form.querySelector('.btn-save');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Saving...';
+        submitBtn.disabled = true;
+
+        try {
+            const res = await fetch('http://localhost:5026/api/auth/edit-profile', {
+                method: 'PUT',
+                headers: {
+                    Authorization: `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            const result = await res.json();
+
+            if (res.ok) {
+                showAlert("Profil berhasil diperbarui!", "success");
+                toggleEditForm();
+                setTimeout(loadProfile, 500);
+            } else {
+                showAlert(result.message || "Gagal memperbarui profil.", "danger");
+            }
+        } catch (err) {
+            showAlert("Terjadi kesalahan saat menyimpan profil.", "danger");
+        } finally {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
+
+        return false;
+    }
+
+    document.addEventListener('DOMContentLoaded', loadProfile);
+</script>

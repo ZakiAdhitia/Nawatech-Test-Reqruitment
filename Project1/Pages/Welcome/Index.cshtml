@@ -1,0 +1,19 @@
+@page
+@{
+    Layout = "/Pages/Shared/Layout.cshtml";
+    @await Html.PartialAsync("Navbar")
+}
+<script>
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+        window.location.href = "/Auth/Login";
+    }
+</script>
+
+<div class="login-container">
+    <div class="decorative-shape shape-1"></div>
+    <div class="decorative-shape shape-2"></div>
+    <div class="decorative-shape shape-3"></div>
+
+
+<h2>Nawatech Recruitment Project</h2>
