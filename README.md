@@ -1,7 +1,6 @@
 ## Cara Menjalankan Website PROJECT 1
 
 1. **Clone repository**
-
 git clone https://github.com/ZakiAdhitia/Nawatech-Test-Reqruitment.git
 cd Project1
 
