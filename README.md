@@ -35,14 +35,16 @@ dotnet run
 ```bash
 dotnet watch run
 ```
+
 open browser: http://localhost:5026
 
 ## Cara Menjalankan PROJECT 2
 
 1. **Clone repository (jika belum clone)**
-
+```bash
 git clone https://github.com/ZakiAdhitia/Nawatech-Test-Reqruitment.git
 cd Project2
+```
 
 2. **jalankan web**
 ```bash
